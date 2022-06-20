@@ -41,7 +41,6 @@
     "minimist": "^1.2.5",
     "npminstall": "^4.9.1",
     "root-check": "^1.0.0",
-    "semver": "^7.3.2",
-    "user-home": "^2.0.0"
+    "semver": "^7.3.2"
   }
 }
