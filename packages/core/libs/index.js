@@ -1,13 +1,17 @@
 const fs = require('fs');
 const path = require('path');
+// 扩展了 fs 没有的一些方法：https://blog.csdn.net/qq_38157825/article/details/115727874
 const fse = require('fs-extra');
+// 处理命令行参数
 const program = require('commander');
+// 命令行输出加颜色
 const colors = require('colors/safe');
-const userHome = require('user-home');
+const { homedir } = require('os');
+const rootCheck = require('root-check');
 const semver = require('semver');
 const { log, npm, Package, exec, locale } = require('@imooc-cli/utils');
 const packageConfig = require('../package');
-const add = require('@imooc-cli/add')
+const add = require('@imooc-cli/add');
 
 const {
   LOWEST_NODE_VERSION,
@@ -43,10 +47,7 @@ function registerCommand() {
       log.success('作者介绍', 'Sam@2020');
     });
 
-  program
-    .command('add')
-    .description('添加内容')
-    .action(add)
+  program.command('add').description('添加内容').action(add);
 
   program
     .command('init [type]')
@@ -56,7 +57,10 @@ function registerCommand() {
     .action(async (type, { packagePath, force }) => {
       const packageName = '@imooc-cli/init';
       const packageVersion = '1.0.0';
-      await execCommand({ packagePath, packageName, packageVersion }, { type, force });
+      await execCommand(
+        { packagePath, packageName, packageVersion },
+        { type, force }
+      );
     });
 
   program
@@ -74,31 +78,13 @@ function registerCommand() {
     .option('--sshUser <sshUser>', '模板服务端用户名')
     .option('--sshIp <sshIp>', '模板服务器IP或域名')
     .option('--sshPath <sshPath>', '模板服务器上传路径')
-    .action(async ({
-      packagePath,
-      refreshToken,
-      refreshOwner,
-      refreshServer,
-      force,
-      prod,
-      sshUser,
-      sshIp,
-      sshPath,
-      keepCache,
-      cnpm,
-      buildCmd,
-    }) => {
-      const packageName = '@imooc-cli/publish';
-      const packageVersion = '1.0.0';
-      if (force) {
-        refreshToken = true;
-        refreshOwner = true;
-        refreshServer = true;
-      }
-      await execCommand({ packagePath, packageName, packageVersion }, {
+    .action(
+      async ({
+        packagePath,
         refreshToken,
         refreshOwner,
         refreshServer,
+        force,
         prod,
         sshUser,
         sshIp,
@@ -106,8 +92,31 @@ function registerCommand() {
         keepCache,
         cnpm,
         buildCmd,
-      });
-    });
+      }) => {
+        const packageName = '@imooc-cli/publish';
+        const packageVersion = '1.0.0';
+        if (force) {
+          refreshToken = true;
+          refreshOwner = true;
+          refreshServer = true;
+        }
+        await execCommand(
+          { packagePath, packageName, packageVersion },
+          {
+            refreshToken,
+            refreshOwner,
+            refreshServer,
+            prod,
+            sshUser,
+            sshIp,
+            sshPath,
+            keepCache,
+            cnpm,
+            buildCmd,
+          }
+        );
+      }
+    );
 
   program
     .command('replace')
@@ -117,11 +126,16 @@ function registerCommand() {
     .option('--bucket <bucket>', 'oss bucket')
     .option('--ossAccessKey <ossAccessKey>', 'oss accessKey')
     .option('--ossSecretKey <ossSecretKey>', 'oss secretKey')
-    .action(async ({ packagePath, region, bucket, ossAccessKey, ossSecretKey }) => {
-      const packageName = '@imooc-cli/replace';
-      const packageVersion = '1.0.0';
-      await execCommand({ packagePath, packageName, packageVersion }, { region, bucket, ossAccessKey, ossSecretKey });
-    });
+    .action(
+      async ({ packagePath, region, bucket, ossAccessKey, ossSecretKey }) => {
+        const packageName = '@imooc-cli/replace';
+        const packageVersion = '1.0.0';
+        await execCommand(
+          { packagePath, packageName, packageVersion },
+          { region, bucket, ossAccessKey, ossSecretKey }
+        );
+      }
+    );
 
   program
     .command('clean')
@@ -145,9 +159,7 @@ function registerCommand() {
       }
     });
 
-  program
-    .option('--debug', '打开调试模式')
-    .parse(process.argv);
+  program.option('--debug', '打开调试模式').parse(process.argv);
 
   if (args._.length < 1) {
     program.outputHelp();
@@ -155,7 +167,10 @@ function registerCommand() {
   }
 }
 
-async function execCommand({ packagePath, packageName, packageVersion }, extraOptions) {
+async function execCommand(
+  { packagePath, packageName, packageVersion },
+  extraOptions
+) {
   let rootFile;
   try {
     if (packagePath) {
@@ -189,13 +204,13 @@ async function execCommand({ packagePath, packageName, packageVersion }, extraOp
     });
     if (fs.existsSync(rootFile)) {
       const code = `require('${rootFile}')(${JSON.stringify(_config)})`;
-      const p = exec('node', ['-e', code], { 'stdio': 'inherit' });
-      p.on('error', e => {
+      const p = exec('node', ['-e', code], { stdio: 'inherit' });
+      p.on('error', (e) => {
         log.verbose('命令执行失败:', e);
         handleError(e);
         process.exit(1);
       });
-      p.on('exit', c => {
+      p.on('exit', (c) => {
         log.verbose('命令执行成功:', c);
         process.exit(c);
       });
@@ -238,10 +253,15 @@ async function prepare() {
 async function checkGlobalUpdate() {
   log.verbose('检查 imooc-cli 最新版本');
   const currentVersion = packageConfig.version;
-  const lastVersion = await npm.getNpmLatestSemverVersion(NPM_NAME, currentVersion);
+  const lastVersion = await npm.getNpmLatestSemverVersion(
+    NPM_NAME,
+    currentVersion
+  );
   if (lastVersion && semver.gt(lastVersion, currentVersion)) {
-    log.warn(colors.yellow(`请手动更新 ${NPM_NAME}，当前版本：${packageConfig.version}，最新版本：${lastVersion}
-                更新命令： npm install -g ${NPM_NAME}`));
+    log.warn(
+      colors.yellow(`请手动更新 ${NPM_NAME}，当前版本：${packageConfig.version}，最新版本：${lastVersion}
+                更新命令： npm install -g ${NPM_NAME}`)
+    );
   }
 }
 
@@ -249,7 +269,7 @@ function checkEnv() {
   log.verbose('开始检查环境变量');
   const dotenv = require('dotenv');
   dotenv.config({
-    path: path.resolve(userHome, '.env'),
+    path: path.resolve(homedir(), '.env'),
   });
   config = createCliConfig(); // 准备基础配置
   log.verbose('环境变量', config);
@@ -257,12 +277,12 @@ function checkEnv() {
 
 function createCliConfig() {
   const cliConfig = {
-    home: userHome,
+    home: homedir(),
   };
   if (process.env.CLI_HOME) {
-    cliConfig['cliHome'] = path.join(userHome, process.env.CLI_HOME);
+    cliConfig['cliHome'] = path.join(homedir(), process.env.CLI_HOME);
   } else {
-    cliConfig['cliHome'] = path.join(userHome, DEFAULT_CLI_HOME);
+    cliConfig['cliHome'] = path.join(homedir(), DEFAULT_CLI_HOME);
   }
   return cliConfig;
 }
@@ -285,20 +305,22 @@ function checkArgs(args) {
 }
 
 function checkUserHome() {
-  if (!userHome || !fs.existsSync(userHome)) {
+  if (!homedir() || !fs.existsSync(homedir())) {
     throw new Error(colors.red('当前登录用户主目录不存在！'));
   }
 }
 
 function checkRoot() {
-  const rootCheck = require('root-check');
   rootCheck(colors.red('请避免使用 root 账户启动本应用'));
 }
 
 function checkNodeVersion() {
-  const semver = require('semver');
   if (!semver.gte(process.version, LOWEST_NODE_VERSION)) {
-    throw new Error(colors.red(`imooc-cli 需要安装 v${LOWEST_NODE_VERSION} 以上版本的 Node.js`));
+    throw new Error(
+      colors.red(
+        `imooc-cli 需要安装 v${LOWEST_NODE_VERSION} 以上版本的 Node.js`
+      )
+    );
   }
 }
 
